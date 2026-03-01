@@ -95,15 +95,157 @@
       background: #fff;
     }
 
-    .file { grid-column: span 5; }
+    .file { grid-column: span 4; }
     .search { grid-column: span 3; }
     .range { grid-column: span 2; }
 
     .actions {
-      grid-column: span 2;
+      grid-column: span 3;
       display: flex;
       align-items: end;
       gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .notes-row {
+      grid-column: span 12;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.85rem;
+    }
+
+    .saved-status-row {
+      grid-column: span 12;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      min-height: 1.4rem;
+    }
+
+    #savedCount {
+      font-weight: 600;
+      color: var(--accent-strong);
+    }
+
+    #clearSavedBtn {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.8rem;
+      padding: 0.2rem 0.55rem;
+      font-weight: 600;
+      border-radius: 6px;
+      display: none;
+    }
+
+    #clearSavedBtn:hover:not(:disabled) {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .regex-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.3rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+      accent-color: var(--accent);
+    }
+
+    .tooltip-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .tooltip-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.1rem;
+      height: 1.1rem;
+      border-radius: 50%;
+      background: var(--line);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: default;
+      flex-shrink: 0;
+    }
+
+    .tooltip-body {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      background: #1c3540;
+      color: #e8f4f2;
+      font-size: 0.78rem;
+      line-height: 1.55;
+      padding: 0.6rem 0.8rem;
+      border-radius: 8px;
+      width: 280px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+      pointer-events: none;
+      white-space: normal;
+    }
+
+    .tooltip-body code {
+      background: rgba(255,255,255,0.12);
+      border-radius: 3px;
+      padding: 0 0.22em;
+      font-family: "Consolas", "Menlo", monospace;
+    }
+
+    .tooltip-wrap:hover .tooltip-body,
+    .tooltip-wrap:focus-within .tooltip-body {
+      display: block;
+    }
+
+    .omit-label {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .omit-label input[type="checkbox"] {
+      accent-color: var(--danger);
+      margin: 0;
+    }
+
+    tr:has(.omit-cb:checked) td {
+      opacity: 0.4;
+      text-decoration: line-through;
+      text-decoration-color: var(--danger);
+    }
+
+    tr:has(.omit-cb:checked) td:first-child {
+      text-decoration: none;
+      opacity: 1;
     }
 
     button {
@@ -193,6 +335,7 @@
       .search { grid-column: span 7; }
       .range { grid-column: span 5; }
       .actions { grid-column: span 12; }
+      .notes-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -212,6 +355,27 @@
       <div class="field search">
         <label for="searchInput">Search string</label>
         <input id="searchInput" type="text" placeholder="e.g. PIPE" />
+        <div class="regex-row">
+          <label class="checkbox-label">
+            <input id="regexCheck" type="checkbox" />
+            Use regex
+          </label>
+          <span class="tooltip-wrap" tabindex="0" aria-label="Regex guide">
+            <span class="tooltip-icon" aria-hidden="true">?</span>
+            <span class="tooltip-body" role="tooltip">
+              <strong>Pattern quick guide</strong><br>
+              When <em>Use regex</em> is <strong>off</strong>:<br>
+              &nbsp;<code>*</code> matches multiple non-space chars<br>
+              &nbsp;<code>?</code> matches one non-space char<br>
+              <br>
+              When <em>Use regex</em> is <strong>on</strong>:<br>
+              &nbsp;<code>.</code> any char &nbsp;<code>\d</code> digit &nbsp;<code>\S</code> non-space<br>
+              &nbsp;<code>*</code> 0+ of prev &nbsp;<code>+</code> 1+ &nbsp;<code>?</code> 0 or 1<br>
+              &nbsp;<code>[abc]</code> char set &nbsp;<code>(a|b)</code> a or b<br>
+              &nbsp;<code>^</code> line start &nbsp;<code>$</code> line end
+            </span>
+          </span>
+        </div>
       </div>
 
       <div class="field range">
@@ -221,7 +385,24 @@
 
       <div class="actions">
         <button id="searchBtn" type="button">Search</button>
+        <button id="addBtn" type="button" disabled>Add to Output</button>
         <button id="csvBtn" type="button" disabled>Download CSV</button>
+      </div>
+
+      <div class="notes-row">
+        <div class="field">
+          <label for="note1">Note 1</label>
+          <input id="note1" type="text" placeholder="Label or note…" />
+        </div>
+        <div class="field">
+          <label for="note2">Note 2</label>
+          <input id="note2" type="text" placeholder="Additional detail…" />
+        </div>
+      </div>
+
+      <div class="saved-status-row">
+        <span id="savedCount"></span>
+        <button id="clearSavedBtn" type="button">Clear saved</button>
       </div>
     </section>
 
@@ -231,6 +412,7 @@
       <table>
         <thead>
           <tr>
+            <th>Omit</th>
             <th>#</th>
             <th>Page</th>
             <th>X (in)</th>
@@ -239,7 +421,7 @@
           </tr>
         </thead>
         <tbody id="resultsBody">
-          <tr><td colspan="5">No results yet.</td></tr>
+          <tr><td colspan="6">No results yet.</td></tr>
         </tbody>
       </table>
     </section>
@@ -307,6 +489,7 @@
     const state = {
       pdfDoc: null,
       results: [],
+      savedResults: [],
       lastSearchTerm: ""
     };
 
@@ -314,8 +497,14 @@
       pdfFile: document.getElementById("pdfFile"),
       searchInput: document.getElementById("searchInput"),
       pageRange: document.getElementById("pageRange"),
+      regexCheck: document.getElementById("regexCheck"),
+      note1: document.getElementById("note1"),
+      note2: document.getElementById("note2"),
       searchBtn: document.getElementById("searchBtn"),
+      addBtn: document.getElementById("addBtn"),
       csvBtn: document.getElementById("csvBtn"),
+      savedCount: document.getElementById("savedCount"),
+      clearSavedBtn: document.getElementById("clearSavedBtn"),
       status: document.getElementById("status"),
       resultsBody: document.getElementById("resultsBody")
     };
@@ -327,18 +516,47 @@
       });
     });
 
-    el.csvBtn.addEventListener("click", () => {
-      if (!state.results.length) {
+    el.addBtn.addEventListener("click", () => {
+      if (!state.results.length) return;
+      const omittedIndices = getOmittedIndices();
+      const note1Val = el.note1.value;
+      const note2Val = el.note2.value;
+      const toAdd = state.results
+        .filter((_, idx) => !omittedIndices.has(idx))
+        .map(row => ({ ...row, note1: note1Val, note2: note2Val }));
+      if (!toAdd.length) {
+        setStatus("All results are omitted — nothing added.", true);
         return;
       }
-      downloadCsv(state.results, buildDefaultFilename(state.lastSearchTerm));
+      state.savedResults.push(...toAdd);
+      updateSavedStatus();
+      el.csvBtn.disabled = false;
+      setStatus(`Added ${toAdd.length} result(s) to output. Total saved: ${state.savedResults.length}.`);
+    });
+
+    el.csvBtn.addEventListener("click", () => {
+      const rows = state.savedResults.length > 0
+        ? state.savedResults
+        : getFilteredCurrentResults(el.note1.value, el.note2.value);
+      if (!rows.length) return;
+      downloadCsv(rows, buildDefaultFilename(state.lastSearchTerm));
+    });
+
+    el.clearSavedBtn.addEventListener("click", () => {
+      state.savedResults = [];
+      updateSavedStatus();
+      el.csvBtn.disabled = state.results.length === 0;
+      setStatus("Saved output cleared.");
     });
 
     el.pdfFile.addEventListener("change", () => {
       state.pdfDoc = null;
       state.results = [];
+      state.savedResults = [];
       renderResults([]);
+      el.addBtn.disabled = true;
       el.csvBtn.disabled = true;
+      updateSavedStatus();
       setStatus("PDF selected. Enter search criteria and run search.");
     });
 
@@ -358,7 +576,16 @@
         throw new Error("Please enter a search string.");
       }
 
+      const useRegex = el.regexCheck.checked;
+      let regex;
+      try {
+        regex = buildRegex(searchTerm, useRegex);
+      } catch (e) {
+        throw new Error(`Invalid regular expression: ${e.message}`);
+      }
+
       el.searchBtn.disabled = true;
+      el.addBtn.disabled = true;
       el.csvBtn.disabled = true;
 
       if (!state.pdfDoc) {
@@ -370,18 +597,55 @@
       const pagesLabel = pages.length > 12 ? `${pages.slice(0, 12).join(", ")}...` : pages.join(", ");
       setStatus(`Searching ${pages.length} page(s): ${pagesLabel}`);
 
-      const results = await searchPdf(state.pdfDoc, searchTerm, pages);
+      const results = await searchPdf(state.pdfDoc, regex, pages);
       state.results = results;
       state.lastSearchTerm = searchTerm;
 
       renderResults(results);
-      el.csvBtn.disabled = results.length === 0;
+      el.addBtn.disabled = results.length === 0;
+      el.csvBtn.disabled = results.length === 0 && state.savedResults.length === 0;
       el.searchBtn.disabled = false;
 
       if (results.length) {
         setStatus(`Found ${results.length} match(es).`);
       } else {
         setStatus("No matches found in the selected page range.");
+      }
+    }
+
+    function buildRegex(term, isRegex) {
+      if (isRegex) {
+        return new RegExp(term, "gi");
+      }
+      // Escape all regex metacharacters except * and ?
+      const escaped = term.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+      // * = one or more non-whitespace chars, ? = exactly one non-whitespace char
+      const pattern = escaped.replace(/\*/g, "\\S+").replace(/\?/g, "\\S");
+      return new RegExp(pattern, "gi");
+    }
+
+    function getOmittedIndices() {
+      return new Set(
+        [...document.querySelectorAll(".omit-cb:checked")].map(cb => Number(cb.dataset.idx))
+      );
+    }
+
+    function getFilteredCurrentResults(note1Val, note2Val) {
+      if (!state.results.length) return [];
+      const omitted = getOmittedIndices();
+      return state.results
+        .filter((_, idx) => !omitted.has(idx))
+        .map(row => ({ ...row, note1: note1Val, note2: note2Val }));
+    }
+
+    function updateSavedStatus() {
+      const count = state.savedResults.length;
+      if (count > 0) {
+        el.savedCount.textContent = `${count} result(s) saved to output`;
+        el.clearSavedBtn.style.display = "";
+      } else {
+        el.savedCount.textContent = "";
+        el.clearSavedBtn.style.display = "none";
       }
     }
 
@@ -448,9 +712,8 @@
       return resolved;
     }
 
-    async function searchPdf(pdfDoc, searchTerm, pages) {
+    async function searchPdf(pdfDoc, regex, pages) {
       const results = [];
-      const needle = searchTerm.toLocaleLowerCase();
 
       for (const pageNumber of pages) {
         const page = await pdfDoc.getPage(pageNumber);
@@ -462,15 +725,11 @@
           }
 
           const text = item.str;
-          const textLower = text.toLocaleLowerCase();
-          let fromIndex = 0;
+          regex.lastIndex = 0;
+          let m;
 
-          while (true) {
-            const foundAt = textLower.indexOf(needle, fromIndex);
-            if (foundAt === -1) {
-              break;
-            }
-
+          while ((m = regex.exec(text)) !== null) {
+            const foundAt = m.index;
             const xPoints = estimateXPoints(item, foundAt);
             const yPoints = estimateYPoints(item);
 
@@ -478,10 +737,12 @@
               page: pageNumber,
               xInches: xPoints / POINTS_PER_INCH,
               yInches: yPoints / POINTS_PER_INCH,
-              match: text.slice(foundAt, foundAt + searchTerm.length)
+              match: m[0]
             });
 
-            fromIndex = foundAt + Math.max(needle.length, 1);
+            if (m[0].length === 0) {
+              regex.lastIndex++;
+            }
           }
         }
       }
@@ -502,16 +763,17 @@
 
     function renderResults(rows) {
       if (!rows.length) {
-        el.resultsBody.innerHTML = "<tr><td colspan=\"5\">No results.</td></tr>";
+        el.resultsBody.innerHTML = '<tr><td colspan="6">No results.</td></tr>';
         return;
       }
 
       const html = rows.map((row, idx) => `
         <tr>
-          <td class=\"mono\">${idx + 1}</td>
-          <td class=\"mono\">${row.page}</td>
-          <td class=\"mono\">${formatNumber(row.xInches)}</td>
-          <td class=\"mono\">${formatNumber(row.yInches)}</td>
+          <td><label class="omit-label"><input type="checkbox" class="omit-cb" data-idx="${idx}" /> omit line</label></td>
+          <td class="mono">${idx + 1}</td>
+          <td class="mono">${row.page}</td>
+          <td class="mono">${formatNumber(row.xInches)}</td>
+          <td class="mono">${formatNumber(row.yInches)}</td>
           <td>${escapeHtml(row.match)}</td>
         </tr>
       `).join("");
@@ -550,7 +812,7 @@
     }
 
     function downloadCsv(rows, fileName) {
-      const header = ["row", "page", "x_inches", "y_inches", "match"];
+      const header = ["row", "page", "x_inches", "y_inches", "match", "note1", "note2"];
       const lines = [header.join(",")];
 
       rows.forEach((row, index) => {
@@ -559,7 +821,9 @@
           row.page,
           formatNumber(row.xInches),
           formatNumber(row.yInches),
-          csvEscape(row.match)
+          csvEscape(row.match),
+          csvEscape(row.note1 ?? ""),
+          csvEscape(row.note2 ?? "")
         ].join(","));
       });
 
