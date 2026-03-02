@@ -315,6 +315,23 @@
       padding: 0.66rem 0.72rem;
     }
 
+    thead th.sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    thead th.sortable:hover {
+      background: #e8f5f3;
+    }
+
+    .sort-indicator {
+      display: inline-block;
+      width: 1em;
+      text-align: center;
+      font-size: 0.85em;
+      color: var(--accent-strong);
+    }
+
     tbody td {
       border-bottom: 1px solid #edf2f1;
       padding: 0.58rem 0.72rem;
@@ -413,15 +430,16 @@
         <thead>
           <tr>
             <th>Omit</th>
-            <th>#</th>
-            <th>Page</th>
+            <th data-sort="row" class="sortable">#<span class="sort-indicator"></span></th>
+            <th data-sort="page" class="sortable">Page<span class="sort-indicator"></span></th>
             <th>X (in)</th>
             <th>Y (in)</th>
-            <th>Match</th>
+            <th data-sort="match" class="sortable">Match<span class="sort-indicator"></span></th>
+            <th>Search</th>
           </tr>
         </thead>
         <tbody id="resultsBody">
-          <tr><td colspan="6">No results yet.</td></tr>
+          <tr><td colspan="7">No results yet.</td></tr>
         </tbody>
       </table>
     </section>
@@ -509,6 +527,22 @@
       resultsBody: document.getElementById("resultsBody")
     };
 
+    const sortState = { col: null, dir: "asc" };
+
+    document.querySelector("thead").addEventListener("click", e => {
+      const th = e.target.closest("[data-sort]");
+      if (!th) return;
+      const col = th.dataset.sort;
+      if (sortState.col === col) {
+        sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+      } else {
+        sortState.col = col;
+        sortState.dir = "asc";
+      }
+      updateSortHeaders();
+      if (state.results.length) renderResults(state.results);
+    });
+
     el.searchBtn.addEventListener("click", () => {
       runSearch().catch((error) => {
         setStatus(error.message || "Unexpected error.", true);
@@ -539,7 +573,7 @@
         ? state.savedResults
         : getFilteredCurrentResults(el.note1.value, el.note2.value);
       if (!rows.length) return;
-      downloadCsv(rows, buildDefaultFilename(state.lastSearchTerm));
+      downloadCsv(rows, buildDefaultFilename());
     });
 
     el.clearSavedBtn.addEventListener("click", () => {
@@ -598,6 +632,7 @@
       setStatus(`Searching ${pages.length} page(s): ${pagesLabel}`);
 
       const results = await searchPdf(state.pdfDoc, regex, pages);
+      results.forEach(r => { r.searchTerm = searchTerm; });
       state.results = results;
       state.lastSearchTerm = searchTerm;
 
@@ -737,7 +772,7 @@
               page: pageNumber,
               xInches: xPoints / POINTS_PER_INCH,
               yInches: yPoints / POINTS_PER_INCH,
-              match: m[0]
+              match: text
             });
 
             if (m[0].length === 0) {
@@ -761,20 +796,44 @@
       return Array.isArray(item.transform) && item.transform.length >= 6 ? item.transform[5] : 0;
     }
 
+    function updateSortHeaders() {
+      document.querySelectorAll("thead [data-sort]").forEach(th => {
+        const indicator = th.querySelector(".sort-indicator");
+        if (!indicator) return;
+        indicator.textContent = sortState.col === th.dataset.sort
+          ? (sortState.dir === "asc" ? " ↑" : " ↓")
+          : "";
+      });
+    }
+
     function renderResults(rows) {
       if (!rows.length) {
-        el.resultsBody.innerHTML = '<tr><td colspan="6">No results.</td></tr>';
+        el.resultsBody.innerHTML = '<tr><td colspan="7">No results.</td></tr>';
         return;
       }
 
-      const html = rows.map((row, idx) => `
+      let indexed = rows.map((row, origIdx) => ({ row, origIdx }));
+      if (sortState.col) {
+        indexed.sort((a, b) => {
+          let va, vb;
+          if (sortState.col === "row") { va = a.origIdx; vb = b.origIdx; }
+          else if (sortState.col === "page") { va = a.row.page; vb = b.row.page; }
+          else if (sortState.col === "match") { va = a.row.match.toLowerCase(); vb = b.row.match.toLowerCase(); }
+          if (va < vb) return sortState.dir === "asc" ? -1 : 1;
+          if (va > vb) return sortState.dir === "asc" ? 1 : -1;
+          return 0;
+        });
+      }
+
+      const html = indexed.map(({ row, origIdx }) => `
         <tr>
-          <td><label class="omit-label"><input type="checkbox" class="omit-cb" data-idx="${idx}" /> omit line</label></td>
-          <td class="mono">${idx + 1}</td>
+          <td><label class="omit-label"><input type="checkbox" class="omit-cb" data-idx="${origIdx}" /> omit line</label></td>
+          <td class="mono">${origIdx + 1}</td>
           <td class="mono">${row.page}</td>
           <td class="mono">${formatNumber(row.xInches)}</td>
           <td class="mono">${formatNumber(row.yInches)}</td>
           <td>${escapeHtml(row.match)}</td>
+          <td>${escapeHtml(row.searchTerm ?? "")}</td>
         </tr>
       `).join("");
 
@@ -794,13 +853,12 @@
         .replaceAll("'", "&#39;");
     }
 
-    function buildDefaultFilename(searchTerm) {
-      const slug = searchTerm
-        .toLocaleLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-
-      return `${slug || "users-search-string"}.csv`;
+    function buildDefaultFilename() {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, "0");
+      const date = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+      const time = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      return `MM_${date}-${time}.csv`;
     }
 
     function csvEscape(value) {
@@ -812,7 +870,7 @@
     }
 
     function downloadCsv(rows, fileName) {
-      const header = ["row", "page", "x_inches", "y_inches", "match", "note1", "note2"];
+      const header = ["row", "page", "x_inches", "y_inches", "match", "search", "note1", "note2"];
       const lines = [header.join(",")];
 
       rows.forEach((row, index) => {
@@ -822,6 +880,7 @@
           formatNumber(row.xInches),
           formatNumber(row.yInches),
           csvEscape(row.match),
+          csvEscape(row.searchTerm ?? ""),
           csvEscape(row.note1 ?? ""),
           csvEscape(row.note2 ?? "")
         ].join(","));
